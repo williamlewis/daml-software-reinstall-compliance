@@ -56,7 +56,7 @@ Each contract is recreated to reflect updated data such as status changes, while
 
 </br>
 
-A script within the module [`SoftwareReinstallCompliance.daml`](HYPERLINK HERE) executes this full sequence for an example user.
+A script within the module [`SoftwareReinstallCompliance.daml`](https://github.com/williamlewis/daml-software-reinstall-compliance/blob/main/daml/SoftwareReinstallCompliance.daml) executes this full sequence for an example user.
 
 By channeling the user status tracking into a chain of smart contracts, the dissemination of information is automated, approvals can be sequenced and trusted across parties, and a clear history of actions remains immutable for future compliance efforts.
 
