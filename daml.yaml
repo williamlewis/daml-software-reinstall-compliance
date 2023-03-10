@@ -1,0 +1,13 @@
+sdk-version: 2.5.3
+name: software-reinstall-compliance
+version: 1.0.0
+source: daml
+parties:
+- User
+- DesignTech
+- CorpIT
+- SoftwareVendor
+dependencies:
+- daml-prim
+- daml-stdlib
+- daml-script

@@ -1,0 +1,243 @@
+-- Multi-party workflow to resolve software reinstallation, including compliance review and approval by external software vendor
+
+module SoftwareReinstallCompliance where
+
+import Daml.Script
+
+
+-------- DATA CONSTRUCTORS --------
+data UserDetails = UserDetails
+  with
+    user : Party            -- Example employee
+    deviceId : Text         -- Hardware Device ID
+      deriving(Eq, Show)
+
+data DeviceDataStatus
+  = DeviceDataRequested
+  | DeviceDataUploaded
+    deriving(Eq, Show)
+
+data DeviceApprovalStatus
+  = PendingDataCollection
+  | QueuedForReview
+  | SentForReview
+  | ApprovedByVendor
+    deriving(Eq, Show)
+
+data DeviceReinstallationStatus
+  = PendingApproval
+  | ApprovedForUninstall
+  | UninstallComplete
+  | ApprovedForReinstall
+  | ReinstallComplete
+    deriving(Eq, Show)
+
+data Approvers = Approvers
+  with
+    designTech : Party      -- Design Technology role, primary responsible
+    corpIT : Party          -- Corporate IT counterpart role
+    softwareVendor : Party  -- Third-party software corporation
+      deriving(Eq, Show)
+
+
+-------- CONTRACT TEMPLATES --------
+template DeviceData
+  with
+    userDetails : UserDetails
+    deviceDataStatus : DeviceDataStatus
+    deviceApprovalStatus : DeviceApprovalStatus
+    deviceReinstallationStatus : DeviceReinstallationStatus
+    approvers : Approvers
+  where
+    signatory approvers.designTech
+    observer userDetails.user
+
+    choice UploadDeviceData
+      : ContractId DeviceData
+      with
+        newUserDeviceId : Text
+        newDeviceDataStatus : DeviceDataStatus
+      controller userDetails.user
+      do
+        create this with
+          userDetails.deviceId = newUserDeviceId
+          deviceDataStatus = DeviceDataUploaded
+    
+    choice QueueDeviceForReview
+      : ContractId DeviceApproval
+      with
+        newDeviceApprovalStatus : DeviceApprovalStatus
+      controller approvers.designTech
+      do
+        assertMsg "DeviceDataStatus must be 'DeviceDataUploaded' before proceeding." (deviceDataStatus == DeviceDataUploaded)
+        create DeviceApproval with
+          deviceApprovalStatus = QueuedForReview
+
+          userDetails = userDetails
+          deviceDataStatus = deviceDataStatus
+          deviceReinstallationStatus = deviceReinstallationStatus
+          approvers = approvers
+
+template DeviceApproval
+  with
+    userDetails : UserDetails
+    deviceDataStatus : DeviceDataStatus
+    deviceApprovalStatus : DeviceApprovalStatus
+    deviceReinstallationStatus : DeviceReinstallationStatus
+    approvers : Approvers
+  where
+    signatory approvers.designTech
+    observer approvers.corpIT, approvers.softwareVendor
+
+    choice SendForReview
+      : ContractId DeviceApproval
+      with
+        newDeviceApprovalStatus : DeviceApprovalStatus
+      controller approvers.corpIT
+      do
+        assertMsg "DeviceApprovalStatus must be 'QueuedForReview' before proceeding." (deviceApprovalStatus == QueuedForReview)
+        create this with
+          deviceApprovalStatus = SentForReview
+    
+    choice ApproveDevice
+      : ContractId DeviceApproval
+      with
+        newDeviceApprovalStatus : DeviceApprovalStatus
+      controller approvers.softwareVendor
+      do
+        assertMsg "DeviceApprovalStatus must be 'SentForReview' before proceeding." (deviceApprovalStatus == SentForReview)
+        create this with
+          deviceApprovalStatus = ApprovedByVendor
+
+    choice RequestUninstall
+      : ContractId DeviceReinstallation
+      with
+        newDeviceReinstallationStatus : DeviceReinstallationStatus
+      controller approvers.designTech
+      do
+        assertMsg "DeviceApprovalStatus must be 'ApprovedByVendor' before proceeding." (deviceApprovalStatus == ApprovedByVendor)
+        create DeviceReinstallation with
+          deviceReinstallationStatus = ApprovedForUninstall
+          
+          userDetails = userDetails
+          deviceDataStatus = deviceDataStatus
+          deviceApprovalStatus = deviceApprovalStatus
+          approvers = approvers
+
+template DeviceReinstallation
+  with
+    userDetails : UserDetails
+    deviceDataStatus : DeviceDataStatus
+    deviceApprovalStatus : DeviceApprovalStatus
+    deviceReinstallationStatus : DeviceReinstallationStatus
+    approvers : Approvers
+  where
+    signatory approvers.designTech
+    observer userDetails.user
+
+    choice CompleteUninstall
+      : ContractId DeviceReinstallation
+      with
+        newDeviceReinstallationStatus : DeviceReinstallationStatus
+      controller userDetails.user
+      do
+        assertMsg "DeviceReinstallationStatus must be 'ApprovedForUninstall' before proceeding." (deviceReinstallationStatus == ApprovedForUninstall)
+        create this with
+          deviceReinstallationStatus = UninstallComplete
+    
+    choice RequestReinstall
+      : ContractId DeviceReinstallation
+      with
+        newDeviceReinstallationStatus : DeviceReinstallationStatus
+      controller approvers.designTech
+      do
+        assertMsg "DeviceReinstallationStatus must be 'UninstallComplete' before proceeding." (deviceReinstallationStatus == UninstallComplete)
+        create this with
+          deviceReinstallationStatus = ApprovedForReinstall
+    
+    choice CompleteReinstall
+      : ContractId DeviceReinstallation
+      with
+        newDeviceReinstallationStatus : DeviceReinstallationStatus
+      controller userDetails.user
+      do
+        assertMsg "DeviceReinstallationStatus must be 'ApprovedForReinstall' before proceeding." (deviceReinstallationStatus == ApprovedForReinstall)
+        create this with
+          deviceReinstallationStatus = ReinstallComplete
+
+
+-------- SCRIPT --------
+user_resolution_procedure = script do
+  dt <- allocateParty "Design Tech"
+  it <- allocateParty "Corporate IT"
+  sv <- allocateParty "Software Vendor"
+  user_name <- allocateParty "S Henderson"
+  let
+    approvers = Approvers
+      with
+        designTech = dt
+        corpIT = it
+        softwareVendor = sv
+    userDetails = UserDetails
+      with
+        user = user_name
+        deviceId = ""
+    deviceDataStatus = DeviceDataRequested
+    deviceApprovalStatus = PendingDataCollection
+    deviceReinstallationStatus = PendingApproval
+
+  -- Design Tech creates initial contract to collect device data
+  requestDeviceData <- submit dt do
+    createCmd DeviceData with
+      approvers
+      userDetails
+      deviceDataStatus
+      deviceApprovalStatus
+      deviceReinstallationStatus
+  
+  -- User responds with necessary device data
+  uploadDeviceData <- submit user_name do
+    exerciseCmd requestDeviceData UploadDeviceData with
+      newUserDeviceId = "NF893FJ0-8FJ3-JK82-2MF9-D83N8233MF90"
+      newDeviceDataStatus = DeviceDataUploaded
+
+  -- Design Tech queues device data in outgoing batch for review
+  queueDeviceForReview <- submit dt do
+    exerciseCmd uploadDeviceData QueueDeviceForReview with
+      newDeviceApprovalStatus = QueuedForReview
+
+  -- Corporate IT sends device data to Software Vendor
+  sendDeviceForReview <- submit it do
+    exerciseCmd queueDeviceForReview SendForReview with
+      newDeviceApprovalStatus = SentForReview
+
+  -- Software Vendor reviews and gives approval for device modifications
+  approveDevice <- submit sv do
+    exerciseCmd sendDeviceForReview ApproveDevice with
+      newDeviceApprovalStatus = ApprovedByVendor
+
+  -- Design Tech relays approval and issues instructions for uninstallation
+  requestUninstall <- submit dt do
+    exerciseCmd approveDevice RequestUninstall with
+      newDeviceReinstallationStatus = ApprovedForUninstall
+
+  -- User performs uninstallation and confirms completion
+  completeUninstall <- submit user_name do
+    exerciseCmd requestUninstall CompleteUninstall with
+      newDeviceReinstallationStatus = UninstallComplete
+
+  -- Design Tech issues additional instructions for fresh installation
+  requestReinstall <- submit dt do
+    exerciseCmd completeUninstall RequestReinstall with
+      newDeviceReinstallationStatus = ApprovedForReinstall
+
+  -- User performs fresh installation and confirms completion
+  completeReinstall <- submit user_name do
+    exerciseCmd requestReinstall CompleteReinstall with
+      newDeviceReinstallationStatus = ReinstallComplete
+  
+  -- Design Tech marks final contract as "archived" to indicate resolution completion for User
+  archiveUserChain <- submit dt do
+    archiveCmd completeReinstall
+
+  return()
