@@ -1,16 +1,16 @@
 # daml-software-reinstall-compliance
 
-*Case study on how the open-source [Daml smart contract language](https://docs.daml.com/) could be used to improve a real-world software management incident involving multiple companies and compliance tracking.*
+*Case study on how the open-source [Daml smart contract language](https://docs.daml.com/) could be used to improve a real-world software incident management event involving multiple companies and compliance tracking.*
 
 </br>
 
 ## Business Scenario
 
-An unexpected error accessing a network license server prevented **130 globally distributed employees** from accessing a core software, **halting business-critical operations**.
+An unexpected error accessing a network license server **prevented 130 globally distributed employees from accessing a core software, halting business-critical operations**.
 
-A full uninstallation and reinstallation was the only recourse, but had been banned due to a coincidental, ongoing audit by the software vendor to check for compliant use of purchased licenses.
+A full uninstallation and reinstallation was the only known recourse, but had been prohibited due to a coincidental, ongoing audit by the software vendor to check for compliant use of purchased licenses.
 
-A solution agreed between parties was to collect hardware data (capturing state of the local environment), send it to the Software Manufacturer for review and approval by individual device, and only then perform the necessary reinstallation.
+A solution agreed between parties was to collect device data (local environment details), seek device-based approval from the software vendor to make modifications, and only then perform the necessary reinstallation.
 
 </br>
 
@@ -28,12 +28,12 @@ This resolution workflow required a combination of Jira, Google Sheets, Google D
 
 ## Smart Contract Solution
 
-To implement a Smart Contract solution in Daml, 3 contract templates are created to reflect the milestones within the end-to-end process:
+To implement a Smart Contract solution in Daml, 3 contract templates are created to reflect general milestones in the overall process:
 1. Device Data Collection
 2. Device Review & Approval
 3. Device Software Reinstallation
 
-Each contract is recreated to reflect updated data such as status changes, while completing a milestone triggers the creation of the next related contract type.
+Each contract is recreated to represent updated data such as status changes, while completing a milestone triggers the creation of the next related contract type.
 
 </br>
 
